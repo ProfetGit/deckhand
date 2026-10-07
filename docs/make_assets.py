@@ -167,7 +167,7 @@ def frame(i):
         glow = 0.5 + 0.5 * math.sin(ph + n * 2.0)
         c2 = QColor(col); c2.setAlpha(int(34 + 30 * glow)); p.setPen(Qt.PenStyle.NoPen); p.setBrush(c2); p.drawRoundedRect(QRectF(x, 334, wd, 48), 24, 24)
         p.setPen(QColor(col)); p.drawText(QRectF(x, 334, wd, 48), int(Qt.AlignmentFlag.AlignCenter), label); x += wd + 14
-    # continuous motion that is only visible at a high frame rate: drifting particles and a light sweep
+    # continuous motion that is only visible at a high frame rate: drifting particles
     p.setPen(Qt.PenStyle.NoPen)
     for n in range(36):
         r_ = (n * 7919 % 1000) / 1000.0
@@ -176,10 +176,6 @@ def frame(i):
         xx = px0 + 18 * math.sin(ph * sp + n)
         a = int(70 * math.sin(math.pi * min(1.0, max(0.0, (H - yy) / H))))
         p.setBrush(QColor(190, 175, 255, a)); p.drawEllipse(QPointF(xx, yy), sz, sz)
-    sx = -400 + (W + 800) * t
-    band = QPainterPath(); band.moveTo(sx, 0); band.lineTo(sx + 140, 0); band.lineTo(sx + 40, H); band.lineTo(sx - 100, H); band.closeSubpath()
-    sg = QLinearGradient(sx - 100, 0, sx + 140, 0); sg.setColorAt(0, QColor(255, 255, 255, 0)); sg.setColorAt(.5, QColor(255, 255, 255, 34)); sg.setColorAt(1, QColor(255, 255, 255, 0))
-    p.fillPath(band, sg)
     p.setClipping(False)
     p.setPen(QPen(QColor(255, 255, 255, 46), 3)); p.setBrush(Qt.BrushStyle.NoBrush)      # border so the rounded corners show on dark pages too
     p.drawRoundedRect(QRectF(1.5, 1.5, W - 3, H - 3), RADIUS - 1.5, RADIUS - 1.5)
