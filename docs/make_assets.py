@@ -123,7 +123,7 @@ items = [("Add action: Hotkey", "to the selected key", "keyboard", None), ("Add 
 pal = CommandPalette(items, w); pal.show(); pal.edit.setText("a"); spin(0.3); save_webp(pal.grab(), "palette.webp"); pal.close()
 
 # ---- animated banner (WebP): every frame is drawn with the real key renderer
-from PyQt6.QtGui import QPainterPath, QPolygonF
+from PyQt6.QtGui import QPainterPath, QPen, QPolygonF
 W, H, FPS, N = 1600, 480, 60, 240          # drawn in a 1600x480 space, written at 0.8x
 SCALE = 0.8
 RADIUS = 34
@@ -152,7 +152,7 @@ def frame(i):
     e.profile["pages"][0]["keys"]["8"]["action"]["params"]["value"] = 12 + (1 if t >= 0.35 else 0) + (1 if t >= 0.8 else 0)
     wp = {"file": wp_path, "dim": 25, "fy": 55, "fx": 50 + 42 * math.sin(ph), "zoom": 150}
     e.profile["wallpaper"] = wallpaper.normalize(wp)
-    p.save(); p.translate(930, 92 + 5 * math.sin(ph)); p.rotate(-4 + 0.9 * math.sin(ph + 1.0))
+    p.save(); p.translate(930 + 6 * math.sin(ph * 2), 92 + 9 * math.sin(ph)); p.rotate(-4 + 1.6 * math.sin(ph + 1.0))
     p.setPen(QColor("#3a3f55")); p.setBrush(QColor("#10121c")); p.drawRoundedRect(QRectF(-34, -34, cols * px + (cols - 1) * gap + 68, rows * px + (rows - 1) * gap + 68), 34, 34)
     for k in range(cols * rows):
         x, y = (k % cols) * (px + gap), (k // cols) * (px + gap)
@@ -167,13 +167,29 @@ def frame(i):
         glow = 0.5 + 0.5 * math.sin(ph + n * 2.0)
         c2 = QColor(col); c2.setAlpha(int(34 + 30 * glow)); p.setPen(Qt.PenStyle.NoPen); p.setBrush(c2); p.drawRoundedRect(QRectF(x, 334, wd, 48), 24, 24)
         p.setPen(QColor(col)); p.drawText(QRectF(x, 334, wd, 48), int(Qt.AlignmentFlag.AlignCenter), label); x += wd + 14
+    # continuous motion that is only visible at a high frame rate: drifting particles and a light sweep
+    p.setPen(Qt.PenStyle.NoPen)
+    for n in range(36):
+        r_ = (n * 7919 % 1000) / 1000.0
+        px0, sp, sz = (n * 104729 % 1600), 1 + (n % 3), 2 + (n % 4) * 1.6
+        yy = H - (((t * sp) + r_) % 1.0) * (H + 20)
+        xx = px0 + 18 * math.sin(ph * sp + n)
+        a = int(70 * math.sin(math.pi * min(1.0, max(0.0, (H - yy) / H))))
+        p.setBrush(QColor(190, 175, 255, a)); p.drawEllipse(QPointF(xx, yy), sz, sz)
+    sx = -400 + (W + 800) * t
+    band = QPainterPath(); band.moveTo(sx, 0); band.lineTo(sx + 140, 0); band.lineTo(sx + 40, H); band.lineTo(sx - 100, H); band.closeSubpath()
+    sg = QLinearGradient(sx - 100, 0, sx + 140, 0); sg.setColorAt(0, QColor(255, 255, 255, 0)); sg.setColorAt(.5, QColor(255, 255, 255, 34)); sg.setColorAt(1, QColor(255, 255, 255, 0))
+    p.fillPath(band, sg)
+    p.setClipping(False)
+    p.setPen(QPen(QColor(255, 255, 255, 46), 3)); p.setBrush(Qt.BrushStyle.NoBrush)      # border so the rounded corners show on dark pages too
+    p.drawRoundedRect(QRectF(1.5, 1.5, W - 3, H - 3), RADIUS - 1.5, RADIUS - 1.5)
     p.end()
     return img
 
 frames = [to_pil(frame(i)) for i in range(N)]
 # WebP frame delays are whole milliseconds: 17 ms is as close to 60 fps (16.67 ms) as the format allows
 frames[0].save(os.path.join(OUT, "banner.webp"), "WEBP", save_all=True, append_images=frames[1:], duration=17, loop=0,
-               quality=62, alpha_quality=90, method=4)
+               quality=54, alpha_quality=85, method=4)
 frames[0].save(os.path.join(OUT, "banner-still.webp"), "WEBP", quality=92, alpha_quality=100, method=6)
 # key close-ups strip
 e.profile["wallpaper"] = wallpaper.normalize({"file": wp_path, "dim": 25, "fy": 55}); e.live.update(playing=True, mic_muted=False)
