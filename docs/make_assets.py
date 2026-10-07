@@ -184,7 +184,7 @@ def frame(i):
 
 frames = [to_pil(frame(i)) for i in range(N)]
 # WebP frame delays are whole milliseconds: 17 ms is as close to 60 fps (16.67 ms) as the format allows
-frames[0].save(os.path.join(OUT, "banner.webp"), "WEBP", save_all=True, append_images=frames[1:], duration=17, loop=0,
+frames[0].save(os.path.join(OUT, "banner-60fps.webp"), "WEBP", save_all=True, append_images=frames[1:], duration=17, loop=0,
                quality=54, alpha_quality=85, method=4)
 frames[0].save(os.path.join(OUT, "banner-still.webp"), "WEBP", quality=92, alpha_quality=100, method=6)
 # key close-ups strip

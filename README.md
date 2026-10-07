@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.webp" alt="Deckhand: the modern Stream Deck studio for Linux" width="100%">
+  <img src="docs/images/banner-60fps.webp" alt="Deckhand: the modern Stream Deck studio for Linux" width="100%">
 </p>
 
 <p align="center">
