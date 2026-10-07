@@ -1,0 +1,4 @@
+# Runtime: PyQt6 (with QtSvg, QtNetwork, QtDBus). Arch: pacman -S python-pyqt6
+PyQt6>=6.6
+# Only needed to run the test suite and regenerate the README images
+Pillow>=10
