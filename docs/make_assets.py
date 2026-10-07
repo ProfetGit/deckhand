@@ -124,7 +124,9 @@ pal = CommandPalette(items, w); pal.show(); pal.edit.setText("a"); spin(0.3); sa
 
 # ---- animated banner (WebP): every frame is drawn with the real key renderer
 from PyQt6.QtGui import QPainterPath, QPolygonF
-W, H, FPS, N = 1600, 480, 15, 60
+W, H, FPS, N = 1600, 480, 60, 240          # drawn in a 1600x480 space, written at 0.8x
+SCALE = 0.8
+RADIUS = 34
 px, gap, cols, rows = 96, 24, 5, 3
 bf = QFont(app.font()); bf.setPixelSize(112); bf.setBold(True); bf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, -2)
 sf = QFont(app.font()); sf.setPixelSize(34)
@@ -133,12 +135,14 @@ cf = QFont(app.font()); cf.setPixelSize(24)
 def frame(i):
     t = i / N
     ph = 2 * math.pi * t
-    img = QImage(W, H, QImage.Format.Format_RGB32); p = QPainter(img)
+    img = QImage(int(W * SCALE), int(H * SCALE), QImage.Format.Format_ARGB32_Premultiplied); img.fill(Qt.GlobalColor.transparent); p = QPainter(img)
     p.setRenderHint(QPainter.RenderHint.Antialiasing); p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    bg = QLinearGradient(0, 0, W, H); bg.setColorAt(0, QColor("#0b0d16")); bg.setColorAt(.55, QColor("#161a2e")); bg.setColorAt(1, QColor("#2a1646")); p.fillRect(img.rect(), bg)
+    p.scale(SCALE, SCALE)
+    rr = QPainterPath(); rr.addRoundedRect(QRectF(0, 0, W, H), RADIUS, RADIUS); p.setClipPath(rr)      # rounded corners, transparent outside
+    bg = QLinearGradient(0, 0, W, H); bg.setColorAt(0, QColor("#0b0d16")); bg.setColorAt(.55, QColor("#161a2e")); bg.setColorAt(1, QColor("#2a1646")); p.fillRect(QRectF(0, 0, W, H), bg)
     for cx, cy, r_, col, ph0 in ((1320, 140, 420, QColor(124, 77, 255, 70), 0), (1500, 420, 360, QColor(255, 95, 109, 55), 2.1), (200, 460, 340, QColor(61, 139, 253, 50), 4.2)):
         ox, oy = 40 * math.sin(ph + ph0), 30 * math.cos(ph + ph0)
-        rg = QRadialGradient(QPointF(cx + ox, cy + oy), r_); rg.setColorAt(0, col); rg.setColorAt(1, QColor(0, 0, 0, 0)); p.fillRect(img.rect(), rg)
+        rg = QRadialGradient(QPointF(cx + ox, cy + oy), r_); rg.setColorAt(0, col); rg.setColorAt(1, QColor(0, 0, 0, 0)); p.fillRect(QRectF(0, 0, W, H), rg)
     # live state that changes during the loop
     e.live["playing"] = not (0.50 <= t < 0.72)          # play/pause icon flips
     e.live["mic_muted"] = 0.22 <= t < 0.42              # mic key flashes its muted look
@@ -166,9 +170,11 @@ def frame(i):
     p.end()
     return img
 
-frames = [to_pil(frame(i)).convert("RGB") for i in range(N)]
-frames[0].save(os.path.join(OUT, "banner.webp"), "WEBP", save_all=True, append_images=frames[1:], duration=int(1000 / FPS), loop=0, quality=78, method=4)
-save_webp(frame(0), "banner-still.webp", 90)
+frames = [to_pil(frame(i)) for i in range(N)]
+# WebP frame delays are whole milliseconds: 17 ms is as close to 60 fps (16.67 ms) as the format allows
+frames[0].save(os.path.join(OUT, "banner.webp"), "WEBP", save_all=True, append_images=frames[1:], duration=17, loop=0,
+               quality=62, alpha_quality=90, method=4)
+frames[0].save(os.path.join(OUT, "banner-still.webp"), "WEBP", quality=92, alpha_quality=100, method=6)
 # key close-ups strip
 e.profile["wallpaper"] = wallpaper.normalize({"file": wp_path, "dim": 25, "fy": 55}); e.live.update(playing=True, mic_muted=False)
 strip = QImage(5 * 164 + 20, 184, QImage.Format.Format_RGB32); strip.fill(QColor("#10121c")); q = QPainter(strip)

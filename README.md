@@ -12,6 +12,7 @@
   <img alt="Python 3" src="https://img.shields.io/badge/python-3.14%20tested-3776ab.svg">
   <img alt="Qt 6" src="https://img.shields.io/badge/UI-PyQt6-41cd52.svg">
   <img alt="Wayland and X11" src="https://img.shields.io/badge/Wayland%20%7C%20X11-supported-8a63d2.svg">
+  <a href="https://github.com/ProfetGit/deckhand/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/ProfetGit/deckhand/actions/workflows/tests.yml/badge.svg"></a>
   <img alt="MCP server" src="https://img.shields.io/badge/MCP-server%20included-ff6b6b.svg">
 </p>
 
