@@ -49,7 +49,7 @@ Linux has Stream Deck tools, but most of them either look dated or make you figh
 | **Network** | HTTP request (GET/POST/PUT/PATCH/DELETE with headers and body) for webhooks and smart-home |
 | **Multimedia** | Play/pause, next/previous, stop, volume, mute, mic mute (optionally pinned to one device) |
 | **Navigation** | Folders, page next/previous, switch profile, brightness |
-| **Widgets** | Live clock, CPU / RAM / GPU gauges, **Now Playing with album art**, counter, stopwatch / countdown timer |
+| **Widgets** | Live clock, CPU / RAM / GPU gauges, **Now Playing with album art**, counter, stopwatch / countdown timer (a countdown rings a built-in chime or your own sound, then resets) |
 | **Multi action** | Chain any actions with delays |
 
 - **Hold actions**: a quick tap runs the main action, holding (configurable) runs a second one.
@@ -219,6 +219,8 @@ python3 tests/test_anim.py             # animated wallpapers
 python3 tests/test_autoswitch.py       # window rules and the D-Bus path
 python3 tests/test_features.py         # hold actions, timers, pages, templates, backups
 python3 tests/test_nowplaying.py       # Now Playing, Spotify / YouTube Music art
+python3 tests/test_timer.py            # timer sound, auto-reset and custom sounds
+python3 tests/test_buttons.py          # button hover glow, pointer cursor
 python3 docs/make_assets.py            # regenerate the images in docs/images
 ```
 

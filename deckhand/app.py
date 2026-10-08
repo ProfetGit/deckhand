@@ -69,6 +69,8 @@ def main():
     server.listen(SOCKET)
 
     app.setStyle("Fusion")
+    from . import buttonfx
+    buttonfx.install(app)
     app.setStyleSheet(style.QSS)
     f = app.font()
     f.setPixelSize(13)

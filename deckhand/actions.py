@@ -70,10 +70,13 @@ reg("counter", "Counter", "plus", "Counts up (or down) every press. Hold to rese
     {"step": 1, "value": 0, "label": ""},
     [F("step", "Change per press", "int", min=-1000, max=1000), F("value", "Current value", "int", min=-1000000, max=1000000),
      F("label", "Label under the number", "string")], dynamic=True, multi=False)
-reg("timer", "Timer", "clock", "Stopwatch or countdown. Press to start/pause, hold to reset.",
-    {"mode": "stopwatch", "minutes": 25},
+reg("timer", "Timer", "clock", "Stopwatch or countdown. Press to start/pause, hold to reset. A countdown plays a sound when it finishes, then resets.",
+    {"mode": "stopwatch", "minutes": 25, "seconds": 0, "sound": "default", "volume": 80},
     [F("mode", "Mode", "choice", options=[("stopwatch", "Stopwatch"), ("countdown", "Countdown")]),
-     F("minutes", "Countdown length (minutes)", "int", min=1, max=600)], dynamic=True, multi=False)
+     F("minutes", "Countdown minutes", "int", min=0, max=600, when={"mode": "countdown"}),
+     F("seconds", "Countdown seconds", "int", min=0, max=59, when={"mode": "countdown"}),
+     F("sound", "Sound when finished", "sound", when={"mode": "countdown"}),
+     F("volume", "Sound volume (%)", "int", min=5, max=100, when={"mode": "countdown"})], dynamic=True, multi=False)
 reg("counter_reset", "Reset Counter", "refresh", "Set the counter back to zero.", multi=False, hidden=True)
 reg("timer_reset", "Reset Timer", "refresh", "Stop and zero the timer.", multi=False, hidden=True)
 

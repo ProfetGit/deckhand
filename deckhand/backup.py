@@ -14,7 +14,7 @@ from . import errors, model
 BACKUP_DIR = os.path.join(model.CONFIG_DIR, "backups")
 KEEP_AUTO = 7
 MAX_UNCOMPRESSED = 512 * 1024 * 1024
-_NAME_OK = re.compile(r"^(manifest\.json|profiles\.json|settings\.json|recent_colors\.json|icons/[^/\\]{1,200})$")
+_NAME_OK = re.compile(r"^(manifest\.json|profiles\.json|settings\.json|recent_colors\.json|icons/[^/\\]{1,200}|sounds/[^/\\]{1,200})$")
 
 
 def _add_config(z, with_icons=True):
@@ -22,11 +22,13 @@ def _add_config(z, with_icons=True):
         p = os.path.join(model.CONFIG_DIR, fn)
         if os.path.exists(p):
             z.write(p, fn)
-    if with_icons and os.path.isdir(model.ICON_DIR):
-        for fn in sorted(os.listdir(model.ICON_DIR)):
-            p = os.path.join(model.ICON_DIR, fn)
-            if os.path.isfile(p):
-                z.write(p, "icons/" + fn)
+    if with_icons:
+        for folder, arc in ((model.ICON_DIR, "icons/"), (os.path.join(model.CONFIG_DIR, "sounds"), "sounds/")):
+            if os.path.isdir(folder):
+                for fn in sorted(os.listdir(folder)):
+                    p = os.path.join(folder, fn)
+                    if os.path.isfile(p):
+                        z.write(p, arc + fn)
 
 
 def create_backup(dest, with_icons=True):
@@ -108,11 +110,12 @@ def restore_backup(path):
             if os.path.exists(src):
                 shutil.copyfile(src, os.path.join(model.CONFIG_DIR, fn + ".new"))
                 os.replace(os.path.join(model.CONFIG_DIR, fn + ".new"), os.path.join(model.CONFIG_DIR, fn))
-        icons_src = os.path.join(tmp, "icons")
-        if os.path.isdir(icons_src):
-            os.makedirs(model.ICON_DIR, exist_ok=True)
-            for fn in os.listdir(icons_src):
-                shutil.copyfile(os.path.join(icons_src, fn), os.path.join(model.ICON_DIR, fn))
+        for name, dest in (("icons", model.ICON_DIR), ("sounds", os.path.join(model.CONFIG_DIR, "sounds"))):
+            src_dir = os.path.join(tmp, name)
+            if os.path.isdir(src_dir):
+                os.makedirs(dest, exist_ok=True)
+                for fn in os.listdir(src_dir):
+                    shutil.copyfile(os.path.join(src_dir, fn), os.path.join(dest, fn))
     return {**info, "safety_copy": safety}
 
 

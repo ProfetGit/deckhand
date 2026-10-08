@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [smoke, test_mcp, test_install, test_resilience, test_anim, test_autoswitch, test_features, test_nowplaying]
+        suite: [smoke, test_mcp, test_install, test_resilience, test_anim, test_autoswitch, test_features, test_nowplaying, test_timer, test_buttons]
     env:
       QT_QPA_PLATFORM: offscreen
     steps:

@@ -12,7 +12,7 @@ import os
 from PyQt6.QtCore import QBuffer, QByteArray, QIODevice, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QGuiApplication, QIcon, QImage, QPainter
 
-from . import actions, autoswitch, icons, keymap, model, render, sysinfo, templates, trouble, wallpaper
+from . import actions, autoswitch, icons, keymap, model, render, sounds, sysinfo, templates, trouble, wallpaper
 from .iconpicker import import_image
 
 VERSION = "1.0.0"
@@ -79,6 +79,7 @@ _TYPE_DOC = {
     "int": "integer", "choice": "string (one of options)", "hotkey": "string like 'ctrl+shift+m', 'f13', 'super+d'",
     "app": "string: .desktop id from list_apps (app name also accepted)", "profile": "string: profile id or name",
     "steps": "array of {type, params}; also {type:'delay', params:{ms}}",
+    "sound": "string: 'default' (built-in chime), 'none', or the path of an audio file (wav, mp3, ogg, flac, m4a; max 10 MB; copied into Deckhand)",
     "audio_in": "string: '' = follow the system default microphone, or a device name/description from list_audio_devices",
     "audio_out": "string: '' = follow the system default output, or a device name/description from list_audio_devices",
 }
@@ -180,6 +181,15 @@ def _coerce(engine, f, v, warnings):
         return _resolve_app(v) if v else ""
     if t == "profile":
         return _resolve_profile(engine, v)["id"] if v else ""
+    if t == "sound":
+        if v in ("", None) or str(v).lower() == "default":
+            return "default"
+        if str(v).lower() == "none":
+            return "none"
+        try:
+            return sounds.import_sound(str(v))
+        except (ValueError, OSError) as ex:
+            raise ToolError(f"param '{key}': {ex}")
     if t in ("audio_in", "audio_out"):
         if v in ("", None, "default"):
             return ""

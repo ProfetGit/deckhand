@@ -3,10 +3,10 @@ import copy
 import os
 
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtWidgets import (QComboBox, QCompleter, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QMenu, QPlainTextEdit,
+from PyQt6.QtWidgets import (QComboBox, QCompleter, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox, QPlainTextEdit,
                              QPushButton, QSpinBox, QVBoxLayout, QWidget)
 
-from . import actions, icons, keymap, style, sysinfo
+from . import actions, errors, icons, keymap, sounds, style, sysinfo
 from .widgets import HotkeyEdit, Switch, fit_combo, icon_btn
 
 
@@ -53,7 +53,7 @@ class AppCombo(QComboBox):
             self.appChosen.emit(self.itemData(i) or "")
 
 
-def make_field(f, value, commit, engine):
+def make_field(f, value, commit, engine, ctx=None):
     t, key = f["type"], f["key"]
     if t == "string":
         w = QLineEdit(value or "")
@@ -135,38 +135,111 @@ def make_field(f, value, commit, engine):
         w.setCurrentIndex(max(0, w.findData(value or "")))
         w.activated.connect(lambda i: commit(w.itemData(i)))
         return w
+    if t == "sound":
+        return SoundField(value or "default", commit, lambda: (ctx or {}).get("volume", 80))
     if t == "steps":
         return StepsEditor(value or [], commit, engine)
     return QLabel("?")
 
 
 def build_form(action, on_param, engine, skip=()):
-    """Vertical form for an action's fields. on_param(key, value) is called on every edit."""
+    """Vertical form for an action's fields. on_param(key, value) is called on every edit.
+    A field with when={param: value} is only shown while that param has that value."""
     box = QWidget()
     lay = QVBoxLayout(box)
     lay.setContentsMargins(0, 0, 0, 0)
     lay.setSpacing(6)
     meta = actions.ACTIONS.get(action["type"], {})
-    params = action.get("params", {})
+    params = dict(action.get("params", {}))
+    conds = []
+
+    def refresh():
+        for cont, when in conds:
+            cont.setVisible(all(params.get(k, meta.get("defaults", {}).get(k)) == v for k, v in when.items()))
+
+    def commit(k, v):
+        params[k] = v
+        on_param(k, v)
+        refresh()
+
     for f in meta.get("fields", []):
         if f["key"] in skip:
             continue
-        w = make_field(f, params.get(f["key"]), lambda v, k=f["key"]: on_param(k, v), engine)
+        cont = QWidget()
+        cl = QVBoxLayout(cont)
+        cl.setContentsMargins(0, 0, 0, 0)
+        cl.setSpacing(6)
+        val = params.get(f["key"], meta.get("defaults", {}).get(f["key"]))
+        w = make_field(f, val, lambda v, k=f["key"]: commit(k, v), engine, ctx=params)
         if f["type"] == "bool":
             row = QHBoxLayout()
             row.addWidget(QLabel(f["label"]), 1)
             row.addWidget(w)
-            lay.addLayout(row)
+            cl.addLayout(row)
         else:
-            lay.addWidget(muted(f["label"].upper()))
-            lay.addWidget(w)
+            cl.addWidget(muted(f["label"].upper()))
+            cl.addWidget(w)
             if f.get("hint"):
                 h = QLabel(f["hint"])
                 h.setWordWrap(True)
                 h.setStyleSheet(f"color:{style.MUTED};font-size:11px;")
-                lay.addWidget(h)
-            lay.addSpacing(4)
+                cl.addWidget(h)
+            cl.addSpacing(4)
+        lay.addWidget(cont)
+        if f.get("when"):
+            conds.append((cont, f["when"]))
+    refresh()
     return box
+
+
+class SoundField(QWidget):
+    """Pick the default chime, a custom audio file, or silence; with a play button to hear it."""
+
+    def __init__(self, value, commit, get_volume):
+        super().__init__()
+        self.value, self.commit, self.get_volume = value, commit, get_volume
+        h = QHBoxLayout(self)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(6)
+        self.combo = fit_combo(QComboBox())
+        self.combo.activated.connect(self._chosen)
+        h.addWidget(self.combo, 1)
+        self.play_btn = icon_btn("play", "Play this sound", 16)
+        self.play_btn.clicked.connect(self._play)
+        h.addWidget(self.play_btn)
+        self._fill()
+
+    def _fill(self):
+        c = self.combo
+        c.clear()
+        c.addItem("Default chime", "default")
+        if self.value not in ("default", "none", "", None):
+            c.addItem(("" if os.path.isfile(self.value) else "(missing) ") + sounds.label(self.value), self.value)
+        c.addItem("Choose a file…", "__choose__")
+        c.addItem("No sound", "none")
+        c.setCurrentIndex(max(0, c.findData(self.value if self.value not in ("", None) else "default")))
+
+    def _chosen(self, i):
+        data = self.combo.itemData(i)
+        if data == "__choose__":
+            path, _ = QFileDialog.getOpenFileName(self.window(), "Choose a sound", os.path.expanduser("~"),
+                                                  "Sounds (" + " ".join("*" + e for e in sounds.EXTS) + ")")
+            if path:
+                try:
+                    data = sounds.import_sound(path)
+                except (ValueError, OSError) as e:
+                    QMessageBox.warning(self.window(), "Could not use that sound", errors.explain(e))
+                    data = self.value
+            else:
+                data = self.value
+        self.value = data
+        self._fill()
+        if data != "__choose__":
+            self.commit(data)
+
+    def _play(self):
+        if not sounds.play(self.value, self.get_volume()):
+            errors.report("No audio output was found to play the sound.", "warn", once_key="sound-test", cooldown=10)
 
 
 class StepsEditor(QWidget):

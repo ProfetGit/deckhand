@@ -76,10 +76,7 @@ e.trigger(3); v1 = e._timer_value(3, e.get_key(3)["action"]["params"]); spin(0.2
 check("second press pauses it", not v1["running"] and abs(v1["seconds"] - v2["seconds"]) < 0.01)
 e.trigger_hold(3); check("hold resets the timer", e._timer_value(3, e.get_key(3)["action"]["params"])["seconds"] == 0)
 e.edit_params(3, mode="countdown", minutes=1)
-e._timers[e._tkey(3)] = {"acc": 59.9, "t0": time.monotonic()}; spin(0.3); msgs.clear(); e._on_tick()
-check("countdown finishes and says so", e._timer_value(3, e.get_key(3)["action"]["params"])["done"] and any("Timer finished" in t for _l, t in msgs), msgs)
-img_done = e.render(3, 72)
-e.trigger(3); check("pressing a finished countdown restarts it", e._timer_value(3, e.get_key(3)["action"]["params"])["running"])
+# (countdown completion, sound and auto-reset are covered in tests/test_timer.py)
 
 # ---- HTTP request against a local server
 got = {}

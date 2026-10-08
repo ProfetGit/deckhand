@@ -193,9 +193,15 @@ def _draw_timer(p, s, params, color):
     col = "#ff6b6b" if run.get("done") else "#3ddc84" if run.get("running") else color
     px = (24 if len(txt) <= 5 else 17) * s
     _text(p, QRectF(0, size * 0.16, size, size * 0.42), txt, px, col, True, shadow=False)
-    label = "Done" if run.get("done") else ("Running" if run.get("running") else "Paused" if secs else
-                                            ("Countdown" if params.get("mode") == "countdown" else "Stopwatch"))
-    _text(p, QRectF(0, size * 0.64, size, size * 0.22), label, 10.5 * s, "#9aa0aa", False, shadow=False)
+    if run.get("done"):
+        label = "Done!"
+    elif run.get("running"):
+        label = "Running"
+    elif run.get("idle", not secs):
+        label = "Countdown" if params.get("mode") == "countdown" else "Stopwatch"
+    else:
+        label = "Paused"
+    _text(p, QRectF(0, size * 0.64, size, size * 0.22), label, 10.5 * s, "#ff9a9a" if run.get("done") else "#9aa0aa", bool(run.get("done")), shadow=False)
 
 
 def _icon_spec(key):

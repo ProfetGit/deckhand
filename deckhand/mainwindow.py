@@ -378,6 +378,7 @@ class MainWindow(QMainWindow):
             b.setFixedSize(30, 26)
             b.setToolTip(e.profile["pages"][i]["name"] + "  (Ctrl+" + str(i + 1) + ")" if i < 9 else e.profile["pages"][i]["name"])
             b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setProperty("glowRadius", 13)
             b.setStyleSheet(f"QPushButton{{padding:0;border-radius:13px;background:{style.CARD};}}"
                             f"QPushButton:checked{{background:{style.ACCENT};border-color:{style.ACCENT};color:white;}}")
             b.clicked.connect(lambda _=False, i=i: e.goto_page(i))

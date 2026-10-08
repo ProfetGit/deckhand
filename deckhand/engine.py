@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from PyQt6.QtCore import QObject, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPainter
 
-from . import actions, autoswitch, backup, errors, hardware, model, motion, render, sysinfo, templates, trouble, wallpaper
+from . import actions, autoswitch, backup, errors, hardware, model, motion, render, sounds, sysinfo, templates, trouble, wallpaper
 
 
 class Engine(QObject):
@@ -61,7 +61,7 @@ class Engine(QObject):
         self._depth = 0
         self._quiet = 0
         self._timers, self._hold_timers, self._held, self._down_at = {}, {}, set(), {}
-        self._timer_done = set()
+        self._timer_flash, self._timer_alarms = {}, {}
         self._anim, self._anim_sig, self._anim_gen, self._anim_idx = None, None, 0, 0
         self._anim_t0 = time.monotonic()
         self.anim_state = {"state": "none"}
@@ -178,14 +178,83 @@ class Engine(QObject):
         k2["action"] = {"type": "timer", "params": {**a["params"], "_run": v}}
         return k2
 
+    DONE_FLASH_S = 3.0
+
+    @staticmethod
+    def _timer_total(params):
+        """Countdown length in seconds (never less than one)."""
+        try:
+            return max(1, int(params.get("minutes", 25)) * 60 + int(params.get("seconds", 0)))
+        except (TypeError, ValueError):
+            return 25 * 60
+
     def _timer_value(self, idx, params):
-        t = self._timers.get(self._tkey(idx), {"acc": 0.0, "t0": None})
-        elapsed = t["acc"] + (time.monotonic() - t["t0"] if t["t0"] is not None else 0.0)
+        return self._tv(self._tkey(idx), params)
+
+    def _tv(self, tk, params):
+        now = time.monotonic()
+        t = self._timers.get(tk)
+        elapsed = (t["acc"] + (now - t["t0"] if t["t0"] is not None else 0.0)) if t else 0.0
+        running = bool(t and t["t0"] is not None)
         if params.get("mode") == "countdown":
-            total = int(params.get("minutes", 25)) * 60
-            left = max(0.0, total - elapsed)
-            return {"seconds": left, "running": t["t0"] is not None and left > 0, "done": left <= 0 and elapsed > 0}
-        return {"seconds": elapsed, "running": t["t0"] is not None, "done": False}
+            total = self._timer_total(params)
+            if self._timer_flash.get(tk, 0) > now or (running and elapsed >= total):
+                return {"seconds": 0, "running": False, "done": True, "idle": False}
+            idle = not running and elapsed == 0
+            return {"seconds": total if idle else max(0.0, total - elapsed), "running": running, "done": False, "idle": idle}
+        return {"seconds": elapsed, "running": running, "done": False, "idle": not running and elapsed == 0}
+
+    # -- countdown completion: sound, notice, then the timer resets itself ----------------------
+    def _arm_alarm(self, tk):
+        self._disarm(tk)
+        tm = self._timers.get(tk)
+        p = (tm or {}).get("params") or {}
+        if not tm or tm["t0"] is None or p.get("mode") != "countdown":
+            return
+        remaining = self._timer_total(p) - tm["acc"] - (time.monotonic() - tm["t0"])
+        t = QTimer(self, singleShot=True)
+        t.timeout.connect(lambda: self._alarm_fired(tk))
+        self._timer_alarms[tk] = t
+        t.start(max(0, int(remaining * 1000) + 30))
+
+    def _disarm(self, tk):
+        t = self._timer_alarms.pop(tk, None)
+        if t:
+            t.stop()
+            t.deleteLater()
+
+    def _alarm_fired(self, tk):
+        tm = self._timers.get(tk)
+        if not tm or tm["t0"] is None:
+            return
+        p = tm.get("params") or {}
+        if tm["acc"] + time.monotonic() - tm["t0"] >= self._timer_total(p) - 0.005:
+            self._finish_timer(tk)
+        else:
+            self._arm_alarm(tk)
+
+    def _finish_timer(self, tk):
+        tm = self._timers.pop(tk, None)
+        self._disarm(tk)
+        if not tm:
+            return
+        p = tm.get("params") or {}
+        self._timer_flash[tk] = time.monotonic() + self.DONE_FLASH_S
+        QTimer.singleShot(int(self.DONE_FLASH_S * 1000) + 60, self._refresh_timer_keys)
+        if not sounds.play(p.get("sound", "default"), p.get("volume", 80)):
+            errors.report("The timer finished, but no sound could be played (no audio output found).", "warn", once_key="timer-sound", cooldown=120)
+        _, missing = sounds.resolve(p.get("sound", "default"))
+        if missing:
+            errors.report("The timer's custom sound file is gone, so the default chime played instead.", "warn", once_key="timer-sound-missing", cooldown=120)
+        errors.report("Timer finished", "ok", once_key=f"timer-done-{tk}", cooldown=1.0)
+        self._refresh_timer_keys()
+
+    def _refresh_timer_keys(self):
+        for i in range(self.n_keys):
+            k = self.get_key(i)
+            if k and (k.get("action") or {}).get("type") == "timer":
+                self.push_key(i)
+                self.key_changed.emit(i)
 
     def render(self, idx, size=72, pressed=False, state=None):
         k = self._with_runtime(idx, self.get_key(idx))
@@ -983,17 +1052,15 @@ class Engine(QObject):
             self.push_key(i, i in self._pressed and self.settings["pressed_effect"])
 
     def _on_tick(self):
+        now = time.monotonic()
+        for tk, tm in list(self._timers.items()):          # safety net in case an alarm was missed (e.g. after suspend)
+            p = tm.get("params") or {}
+            if tm["t0"] is not None and p.get("mode") == "countdown" and tm["acc"] + now - tm["t0"] >= self._timer_total(p):
+                self._finish_timer(tk)
         dyn = False
         for i in range(self.n_keys):
             k = self.get_key(i)
             a = k.get("action") if k else None
-            if a and a["type"] == "timer":
-                v, tk = self._timer_value(i, a["params"]), self._tkey(i)
-                if v["done"] and tk not in self._timer_done:
-                    self._timer_done.add(tk)
-                    errors.report(f"Timer finished (key {i + 1})", "ok")
-                elif not v["done"]:
-                    self._timer_done.discard(tk)
             if a and actions.ACTIONS.get(a["type"], {}).get("dynamic"):
                 dyn = True
                 self.push_key(i)
@@ -1126,16 +1193,22 @@ class Engine(QObject):
         elif t == "counter_reset" and act.get("type") == "counter":
             p["value"] = 0
         elif t == "timer":
-            tm = self._timers.setdefault(self._tkey(idx), {"acc": 0.0, "t0": None})
-            if self._timer_value(idx, p)["done"]:
-                tm["acc"], tm["t0"] = 0.0, None
+            tk = self._tkey(idx)
+            tm = self._timers.setdefault(tk, {"acc": 0.0, "t0": None})
+            tm["params"] = p
+            self._timer_flash.pop(tk, None)
             if tm["t0"] is None:
                 tm["t0"] = time.monotonic()
+                self._arm_alarm(tk)
             else:
                 tm["acc"] += time.monotonic() - tm["t0"]
                 tm["t0"] = None
+                self._disarm(tk)
         elif t == "timer_reset":
-            self._timers.pop(self._tkey(idx), None)
+            tk = self._tkey(idx)
+            self._timers.pop(tk, None)
+            self._timer_flash.pop(tk, None)
+            self._disarm(tk)
         self._save_timer.start()
         self.push_key(idx)
         self.key_changed.emit(idx)
