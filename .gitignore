@@ -4,3 +4,7 @@ __pycache__/
 last.png
 *.part
 .venv/
+build/
+dist/
+*.egg-info/
+*.pkg.tar.zst

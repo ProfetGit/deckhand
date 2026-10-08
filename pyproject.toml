@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deckhand"
+dynamic = ["version"]
+description = "A modern Stream Deck studio for Linux"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+dependencies = ["PyQt6>=6.6"]
+classifiers = [
+    "Environment :: X11 Applications :: Qt",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Desktop Environment",
+]
+
+[project.optional-dependencies]
+test = ["Pillow>=10"]
+
+[project.urls]
+Homepage = "https://github.com/ProfetGit/deckhand"
+
+[project.scripts]
+deckhand = "deckhand.cli:main"
+
+[tool.setuptools]
+packages = ["deckhand"]
+
+[tool.setuptools.dynamic]
+version = { attr = "deckhand.agentapi.VERSION" }
+
+[tool.setuptools.package-data]
+deckhand = ["assets/*"]

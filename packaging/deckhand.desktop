@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Deckhand
+GenericName=Stream Deck Control
+Comment=Configure and run your Stream Deck
+Exec=deckhand
+Icon=deckhand
+Terminal=false
+Categories=Utility;Settings;
+StartupWMClass=deckhand
+Keywords=streamdeck;elgato;macro;

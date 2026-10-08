@@ -125,6 +125,19 @@ sudo pacman -S python-pyqt6 hidapi
 
 ### Get it
 
+**Arch / CachyOS** (installs the dependencies, launcher, menu entry, icon and the udev rules for you):
+
+```bash
+git clone https://github.com/ProfetGit/deckhand.git
+cd deckhand/packaging/arch && makepkg -si
+```
+
+**Any distro with PyQt6 and hidapi installed:** `pipx install --system-site-packages git+https://github.com/ProfetGit/deckhand.git` (then add the udev rules below).
+
+A Flatpak manifest is in `packaging/flatpak/` as an untested draft with sandbox limits; prefer the options above.
+
+**From a checkout** (per-user, no root):
+
 ```bash
 git clone https://github.com/ProfetGit/deckhand.git
 cd deckhand

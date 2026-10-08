@@ -19,6 +19,21 @@ jobs:
           python-version: "3.12"
       - run: python -m compileall -q deckhand tests docs
 
+  package:
+    name: Build and install the wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build && python -m build --wheel
+      - name: Install it and run the console script
+        run: |
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install --no-deps dist/*.whl
+          /tmp/venv/bin/deckhand mcp status
+
   tests:
     name: ${{ matrix.suite }}
     runs-on: ubuntu-latest

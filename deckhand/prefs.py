@@ -5,11 +5,10 @@ from PyQt6.QtCore import Qt, QTime, pyqtSignal
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import QComboBox, QDialog, QFileDialog, QFrame, QMessageBox, QTimeEdit, QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QSlider, QVBoxLayout
 
-from . import errors, keymap, style, trouble
+from . import errors, keymap, mcp_install, style, trouble
 from .widgets import Switch, fit_combo
 
 AUTOSTART = os.path.expanduser("~/.config/autostart/deckhand.desktop")
-LAUNCHER = os.path.expanduser("~/.local/bin/deckhand")
 
 
 def autostart_enabled():
@@ -21,7 +20,7 @@ def set_autostart(on):
         os.makedirs(os.path.dirname(AUTOSTART), exist_ok=True)
         with open(AUTOSTART, "w") as f:
             f.write("[Desktop Entry]\nType=Application\nName=Deckhand\nComment=Stream Deck control\n"
-                    f"Exec={LAUNCHER} --minimized\nIcon=deckhand\nX-KDE-autostart-after=panel\n")
+                    f"Exec={mcp_install.launcher_path()} --minimized\nIcon=deckhand\nX-KDE-autostart-after=panel\n")
     elif os.path.exists(AUTOSTART):
         os.replace(AUTOSTART, AUTOSTART + ".disabled")
 

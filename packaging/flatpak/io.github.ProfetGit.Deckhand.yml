@@ -1,0 +1,48 @@
+# DRAFT, untested: flatpak-builder was not available when this was written.
+# Build: flatpak-builder --user --install --force-clean build packaging/flatpak/io.github.ProfetGit.Deckhand.yml
+# See packaging/flatpak/README.md for what works inside the sandbox and what does not.
+app-id: io.github.ProfetGit.Deckhand
+runtime: org.kde.Platform
+runtime-version: '6.8'
+sdk: org.kde.Sdk
+base: io.qt.PyQt.BaseApp
+base-version: '6.8'
+command: deckhand
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=all                      # USB access to the deck and /dev/uinput
+  - --socket=pulseaudio
+  - --filesystem=xdg-pictures:ro      # wallpapers and icons
+  - --filesystem=xdg-config/autostart # the "start at login" switch
+  - --talk-name=org.kde.KWin          # per-window profile switching
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.mpris.MediaPlayer2.*  # Now Playing
+  - --own-name=org.deckhand.Deckhand
+modules:
+  - name: hidapi
+    buildsystem: cmake-ninja
+    config-opts: [-DCMAKE_BUILD_TYPE=Release]
+    sources:
+      - type: archive
+        url: https://github.com/libusb/hidapi/archive/refs/tags/hidapi-0.14.0.tar.gz
+        sha256: a5714234abe6e1f53647dd8cba7d69f65f71c558b7896ed218864ffcf405bcbd
+    modules:
+      - name: libusb
+        config-opts: [--disable-static, --disable-udev]
+        sources:
+          - type: archive
+            url: https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.0.27.tar.bz2
+            sha256: ffaa41d741a8a3bee244ac8e54a72ea05bf2879663c098c82fc5757853441575
+  - name: deckhand
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-deps --no-build-isolation --prefix=/app .
+      - install -Dm644 packaging/deckhand.desktop /app/share/applications/io.github.ProfetGit.Deckhand.desktop
+      - install -Dm644 deckhand/assets/deckhand.svg /app/share/icons/hicolor/scalable/apps/io.github.ProfetGit.Deckhand.svg
+      - install -Dm644 packaging/io.github.ProfetGit.Deckhand.metainfo.xml /app/share/metainfo/io.github.ProfetGit.Deckhand.metainfo.xml
+      - sed -i 's/^Icon=.*/Icon=io.github.ProfetGit.Deckhand/' /app/share/applications/io.github.ProfetGit.Deckhand.desktop
+    sources:
+      - type: dir
+        path: ../..
