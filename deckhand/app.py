@@ -71,6 +71,8 @@ def main():
     app.setStyle("Fusion")
     from . import buttonfx
     buttonfx.install(app)
+    from . import wheelguard
+    wheelguard.install(app)
     app.setStyleSheet(style.QSS)
     f = app.font()
     f.setPixelSize(13)

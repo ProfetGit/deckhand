@@ -51,6 +51,14 @@ def fit_combo(c):
     return c
 
 
+def compact_combo(c, min_width=120):
+    """Dropdown that is only as wide as its longest item."""
+    c.setSizeAdjustPolicy(c.SizeAdjustPolicy.AdjustToContents)
+    c.setMinimumWidth(min_width)
+    c.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+    return c
+
+
 def icon_btn(glyph, tip="", size=18, color="#c9c9d2", flat=True):
     b = QToolButton()
     b.setIcon(icons.glyph_icon(glyph, size, color))

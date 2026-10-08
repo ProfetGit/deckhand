@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QBoxLayout, QComboBox, QMenu, QFrame, QHBoxLayout, 
 from . import actions, forms, icons, model, render, style, sysinfo
 from .iconpicker import pick_icon
 from . import motion
-from .widgets import ColorButton, ElidedLabel, Segmented, Switch, fit_combo, icon_btn
+from .widgets import ColorButton, ElidedLabel, Segmented, Switch, compact_combo, fit_combo, icon_btn
 
 
 def card(title, right=None):
@@ -418,7 +418,8 @@ class Inspector(QWidget):
             pick.removeItem(0)
             pick.setCurrentIndex(max(0, pick.findData(a["type"])))
         pick.activated.connect(lambda i: self._set_action(pick.itemData(i)))
-        lay.addWidget(pick)
+        compact_combo(pick, 200)
+        lay.addWidget(pick, 0, Qt.AlignmentFlag.AlignLeft)
         if a and a["type"] in actions.ACTIONS:
             meta = actions.ACTIONS[a["type"]]
             if meta["fields"]:
