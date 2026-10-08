@@ -15,7 +15,7 @@ from PyQt6.QtGui import QColor, QFont, QGuiApplication, QIcon, QImage, QPainter
 from . import actions, autoswitch, icons, keymap, model, render, sounds, sysinfo, templates, trouble, wallpaper
 from .iconpicker import import_image
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 LEVELS = {"read": 0, "edit": 1, "full": 2}
 LEVEL_NAMES = {"read": "Read-only", "edit": "Edit layout", "full": "Full control"}
 
