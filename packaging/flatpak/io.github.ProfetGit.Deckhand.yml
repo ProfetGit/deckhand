@@ -1,12 +1,11 @@
-# DRAFT, untested: flatpak-builder was not available when this was written.
-# Build: flatpak-builder --user --install --force-clean build packaging/flatpak/io.github.ProfetGit.Deckhand.yml
-# See packaging/flatpak/README.md for what works inside the sandbox and what does not.
+# Builds with flatpak-builder (KDE 6.11 runtime + PyQt base app) and starts; see packaging/flatpak/README.md for what was and was not tested.
+# Build: flatpak run org.flatpak.Builder --user --install --force-clean build packaging/flatpak/io.github.ProfetGit.Deckhand.yml
 app-id: io.github.ProfetGit.Deckhand
 runtime: org.kde.Platform
-runtime-version: '6.8'
+runtime-version: '6.11'
 sdk: org.kde.Sdk
-base: io.qt.PyQt.BaseApp
-base-version: '6.8'
+base: com.riverbankcomputing.PyQt.BaseApp
+base-version: '6.11'
 command: deckhand
 finish-args:
   - --share=ipc
@@ -21,20 +20,19 @@ finish-args:
   - --talk-name=org.mpris.MediaPlayer2.*  # Now Playing
   - --own-name=org.deckhand.Deckhand
 modules:
-  - name: hidapi
-    buildsystem: cmake-ninja
-    config-opts: [-DCMAKE_BUILD_TYPE=Release]
+  - name: libusb
+    config-opts: [--disable-static, --disable-udev]
     sources:
       - type: archive
-        url: https://github.com/libusb/hidapi/archive/refs/tags/hidapi-0.14.0.tar.gz
-        sha256: a5714234abe6e1f53647dd8cba7d69f65f71c558b7896ed218864ffcf405bcbd
-    modules:
-      - name: libusb
-        config-opts: [--disable-static, --disable-udev]
-        sources:
-          - type: archive
-            url: https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.0.27.tar.bz2
-            sha256: ffaa41d741a8a3bee244ac8e54a72ea05bf2879663c098c82fc5757853441575
+        url: https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.0.27.tar.bz2
+        sha256: ffaa41d741a8a3bee244ac8e54a72ea05bf2879663c098c82fc5757853441575
+  - name: hidapi
+    buildsystem: cmake-ninja
+    config-opts: [-DCMAKE_BUILD_TYPE=Release, -DHIDAPI_WITH_HIDRAW=OFF, -DHIDAPI_WITH_LIBUSB=ON]
+    sources:
+      - type: archive
+        url: https://github.com/libusb/hidapi/archive/refs/tags/hidapi-0.15.0.tar.gz
+        sha256: 5d84dec684c27b97b921d2f3b73218cb773cf4ea915caee317ac8fc73cef8136
   - name: deckhand
     buildsystem: simple
     build-commands:

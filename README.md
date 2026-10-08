@@ -134,7 +134,7 @@ cd deckhand/packaging/arch && makepkg -si
 
 **Any distro with PyQt6 and hidapi installed:** `pipx install --system-site-packages git+https://github.com/ProfetGit/deckhand.git` (then add the udev rules below).
 
-A Flatpak manifest is in `packaging/flatpak/` as an untested draft with sandbox limits; prefer the options above.
+A Flatpak manifest is in `packaging/flatpak/`. It builds and starts, but actions that run host tools do not work inside the sandbox; prefer the options above.
 
 **From a checkout** (per-user, no root):
 

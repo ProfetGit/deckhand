@@ -1,8 +1,11 @@
-# Flatpak (draft, untested)
+# Flatpak
 
-`io.github.ProfetGit.Deckhand.yml` is a starting point, written without `flatpak-builder` available, so it has never been built. The hidapi/libusb checksums and the PyQt base app version need checking when it is first built.
+`io.github.ProfetGit.Deckhand.yml` builds with flatpak-builder (org.kde.Platform 6.11, `com.riverbankcomputing.PyQt.BaseApp`, libusb and hidapi from source).
 
-Known limits inside the sandbox, even once it builds:
+Tested: the build succeeds, appstream composes, inside the sandbox `deckhand mcp status` runs, libhidapi loads, QtSvg/QtNetwork/QtDBus import and the app starts (offscreen).
+Not tested: talking to a real deck, tray, KWin profile switching, Now Playing from the sandbox.
+
+Known limits inside the sandbox:
 - Actions that run host programs (Run Command, Type Text via `wl-copy`, Screenshot via Spectacle, Open App, mute via `pactl`, Toggle Monitor via `kscreen-doctor`) cannot see the host's tools. They would need `flatpak-spawn --host`, which requires `--talk-name=org.freedesktop.Flatpak` and is not accepted on Flathub.
 - The udev rules for the deck and `/dev/uinput` still have to be installed on the host.
 
