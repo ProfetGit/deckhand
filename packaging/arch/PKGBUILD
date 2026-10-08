@@ -1,7 +1,7 @@
 # Maintainer: ProfetGit
 pkgname=deckhand-git
 _name=deckhand
-pkgver=1.0.0
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="A modern Stream Deck studio for Linux"
 arch=(any)
