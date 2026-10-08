@@ -79,6 +79,7 @@ _TYPE_DOC = {
     "int": "integer", "choice": "string (one of options)", "hotkey": "string like 'ctrl+shift+m', 'f13', 'super+d'",
     "app": "string: .desktop id from list_apps (app name also accepted)", "profile": "string: profile id or name",
     "steps": "array of {type, params}; also {type:'delay', params:{ms}}",
+    "color": "string: '#rrggbb', or '' for the built-in (auto) colour",
     "sound": "string: 'default' (built-in chime), 'none', or the path of an audio file (wav, mp3, ogg, flac, m4a; max 10 MB; copied into Deckhand)",
     "audio_in": "string: '' = follow the system default microphone, or a device name/description from list_audio_devices",
     "audio_out": "string: '' = follow the system default output, or a device name/description from list_audio_devices",
@@ -101,6 +102,8 @@ def catalog(category=None):
                 d["min"], d["max"] = f.get("min", 0), f.get("max", 100)
             if a["defaults"].get(f["key"]) is not None:
                 d["default"] = a["defaults"][f["key"]]
+            if f.get("when"):
+                d["only_when"] = f["when"]
             params[f["key"]] = d
         if aid == "folder":
             params = {"name": {"type": "string", "label": "Folder name (used when the folder is created)"}}
@@ -146,6 +149,13 @@ def _coerce(engine, f, v, warnings):
         if not isinstance(v, str):
             raise ToolError(f"param '{key}' must be a string")
         return v
+    if t == "color":
+        if v in ("", None) or str(v).lower() == "auto":
+            return ""
+        c = QColor(str(v))
+        if not c.isValid():
+            raise ToolError(f"param '{key}' must be a color like '#ff8800', or '' for auto")
+        return c.name()
     if t == "bool":
         if isinstance(v, str) and v.lower() in ("true", "false"):
             return v.lower() == "true"

@@ -2,12 +2,12 @@
 import copy
 import os
 
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (QComboBox, QCompleter, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QMenu, QMessageBox, QPlainTextEdit,
-                             QPushButton, QSpinBox, QVBoxLayout, QWidget)
+                             QLayout, QPushButton, QSizePolicy, QSpinBox, QVBoxLayout, QWidget)
 
 from . import actions, errors, icons, keymap, sounds, style, sysinfo
-from .widgets import HotkeyEdit, Switch, fit_combo, icon_btn
+from .widgets import ColorButton, HotkeyEdit, Switch, compact_combo, fit_combo, icon_btn
 
 
 def muted(text):
@@ -53,6 +53,64 @@ class AppCombo(QComboBox):
             self.appChosen.emit(self.itemData(i) or "")
 
 
+class FlowLayout(QLayout):
+    """Lays small items out left to right and wraps them onto new rows (hidden items are skipped)."""
+
+    def __init__(self, parent=None, hspace=22, vspace=18):
+        super().__init__(parent)
+        self.items, self.hs, self.vs = [], hspace, vspace
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item):
+        self.items.append(item)
+
+    def count(self):
+        return len(self.items)
+
+    def itemAt(self, i):
+        return self.items[i] if 0 <= i < len(self.items) else None
+
+    def takeAt(self, i):
+        return self.items.pop(i) if 0 <= i < len(self.items) else None
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, w):
+        return self._lay(QRect(0, 0, w, 0), False)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self._lay(rect, True)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        sz = QSize()
+        for it in self.items:
+            if not it.isEmpty():
+                sz = sz.expandedTo(it.minimumSize())
+        return sz
+
+    def _lay(self, rect, apply):
+        x, y, row_h = rect.x(), rect.y(), 0
+        for it in self.items:
+            if it.isEmpty():
+                continue
+            sz = it.sizeHint()
+            if x > rect.x() and x + sz.width() > rect.right() + 1:
+                x, y, row_h = rect.x(), y + row_h + self.vs, 0
+            if apply:
+                it.setGeometry(QRect(QPoint(x, y), sz))
+            x += sz.width() + self.hs
+            row_h = max(row_h, sz.height())
+        return y + row_h - rect.y()
+
+
+COMPACT = ("int", "choice", "color", "profile")
+
+
 def make_field(f, value, commit, engine, ctx=None):
     t, key = f["type"], f["key"]
     if t == "string":
@@ -73,18 +131,14 @@ def make_field(f, value, commit, engine, ctx=None):
         w.toggled.connect(commit)
         return w
     if t == "choice":
-        w = fit_combo(QComboBox())
+        w = compact_combo(QComboBox())
         for v, label in f["options"]:
             w.addItem(label, v)
         w.setCurrentIndex(max(0, w.findData(value)))
         w.activated.connect(lambda i: commit(w.itemData(i)))
         return w
     if t == "int":
-        w = QSpinBox()
-        w.setRange(f.get("min", 0), f.get("max", 100))
-        w.setValue(int(value or 0))
-        w.valueChanged.connect(commit)
-        return w
+        return SpinField(f.get("min", 0), f.get("max", 100), int(value or 0), commit)
     if t == "hotkey":
         w = HotkeyEdit()
         w.set_value(value or {})
@@ -116,6 +170,8 @@ def make_field(f, value, commit, engine, ctx=None):
             b.clicked.connect(pick)
             h.addWidget(b)
         return box
+    if t == "color":
+        return ColorField(value or "", commit)
     if t == "profile":
         w = fit_combo(QComboBox())
         for p in engine.profiles():
@@ -148,7 +204,7 @@ def build_form(action, on_param, engine, skip=()):
     box = QWidget()
     lay = QVBoxLayout(box)
     lay.setContentsMargins(0, 0, 0, 0)
-    lay.setSpacing(6)
+    lay.setSpacing(16)
     meta = actions.ACTIONS.get(action["type"], {})
     params = dict(action.get("params", {}))
     conds = []
@@ -162,34 +218,119 @@ def build_form(action, on_param, engine, skip=()):
         on_param(k, v)
         refresh()
 
+    flow = None
     for f in meta.get("fields", []):
         if f["key"] in skip:
             continue
         cont = QWidget()
         cl = QVBoxLayout(cont)
         cl.setContentsMargins(0, 0, 0, 0)
-        cl.setSpacing(6)
+        cl.setSpacing(7)
         val = params.get(f["key"], meta.get("defaults", {}).get(f["key"]))
         w = make_field(f, val, lambda v, k=f["key"]: commit(k, v), engine, ctx=params)
+        small = f["type"] in COMPACT
         if f["type"] == "bool":
             row = QHBoxLayout()
-            row.addWidget(QLabel(f["label"]), 1)
+            row.setSpacing(12)
+            row.setContentsMargins(0, 2, 0, 2)
             row.addWidget(w)
+            row.addWidget(QLabel(f["label"]))
+            row.addStretch(1)
             cl.addLayout(row)
         else:
-            cl.addWidget(muted(f["label"].upper()))
-            cl.addWidget(w)
+            lab = muted(f["label"].upper())
+            cl.addWidget(lab)
+            cl.addWidget(w, 0, Qt.AlignmentFlag.AlignLeft if small else Qt.AlignmentFlag(0))
             if f.get("hint"):
-                h = QLabel(f["hint"])
-                h.setWordWrap(True)
-                h.setStyleSheet(f"color:{style.MUTED};font-size:11px;")
-                cl.addWidget(h)
-            cl.addSpacing(4)
-        lay.addWidget(cont)
+                if small:
+                    lab.setToolTip(f["hint"])
+                    w.setToolTip(f["hint"])
+                else:
+                    h = QLabel(f["hint"])
+                    h.setWordWrap(True)
+                    h.setStyleSheet(f"color:{style.MUTED};font-size:11px;")
+                    cl.addWidget(h)
+        if small:
+            if flow is None:
+                holder = QWidget()
+                flow = FlowLayout(holder)
+                lay.addWidget(holder)
+            flow.addWidget(cont)
+        else:
+            flow = None
+            lay.addWidget(cont)
         if f.get("when"):
             conds.append((cont, f["when"]))
     refresh()
     return box
+
+
+class SpinField(QWidget):
+    """Compact number box with minus / plus buttons (the wheel and arrow keys work too)."""
+
+    def __init__(self, lo, hi, value, commit):
+        super().__init__()
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        h = QHBoxLayout(self)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(4)
+        self.spin = QSpinBox()
+        self.spin.setRange(lo, hi)
+        self.spin.setValue(value)
+        self.spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.spin.setFixedWidth(max(64, 28 + 9 * len(str(max(abs(lo), abs(hi))))))
+        self.spin.valueChanged.connect(commit)
+        minus, plus = icon_btn("minus", "Decrease", 14), icon_btn("plus", "Increase", 14)
+        for b in (minus, plus):
+            b.setFixedSize(30, 30)
+            b.setAutoRepeat(True)
+            b.setAutoRepeatInterval(60)
+        minus.clicked.connect(lambda: self.spin.stepDown())
+        plus.clicked.connect(lambda: self.spin.stepUp())
+        h.addWidget(minus)
+        h.addWidget(self.spin)
+        h.addWidget(plus)
+
+    def value(self):
+        return self.spin.value()
+
+
+class ColorField(QWidget):
+    """A colour swatch with an Auto button; an empty value means 'use the built-in colour'."""
+
+    def __init__(self, value, commit):
+        super().__init__()
+        self.commit = commit
+        h = QHBoxLayout(self)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(8)
+        self.btn = ColorButton(value or "#808080", "Choose a colour")
+        self.btn.changed.connect(self._picked)
+        h.addWidget(self.btn)
+        self.state = QLabel()
+        self.state.setStyleSheet(f"color:{style.MUTED};font-size:11px;")
+        h.addWidget(self.state)
+        self.auto = QPushButton("Reset")
+        self.auto.setFixedWidth(60)
+        self.auto.setToolTip("Go back to the automatic colour")
+        self.auto.clicked.connect(self._reset)
+        h.addWidget(self.auto)
+        h.addStretch(1)
+        self._show(value)
+
+    def _show(self, value):
+        self.auto.setEnabled(bool(value))
+        self.btn.setEnabled(True)
+        self.state.setText(value if value else "Auto")
+        self.state.setMinimumWidth(52)
+
+    def _picked(self, c):
+        self._show(c)
+        self.commit(c)
+
+    def _reset(self):
+        self._show("")
+        self.commit("")
 
 
 class SoundField(QWidget):

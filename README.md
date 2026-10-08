@@ -49,7 +49,7 @@ Linux has Stream Deck tools, but most of them either look dated or make you figh
 | **Network** | HTTP request (GET/POST/PUT/PATCH/DELETE with headers and body) for webhooks and smart-home |
 | **Multimedia** | Play/pause, next/previous, stop, volume, mute, mic mute (optionally pinned to one device) |
 | **Navigation** | Folders, page next/previous, switch profile, brightness |
-| **Widgets** | Live clock, CPU / RAM / GPU gauges, **Now Playing with album art**, counter, stopwatch / countdown timer (a countdown rings a built-in chime or your own sound, then resets) |
+| **Widgets** | Live clock, CPU / RAM / GPU gauges, **Now Playing with album art**, counter, stopwatch / countdown timer (a countdown rings a built-in chime or your own sound, then resets). Every widget has its own colours, sizes and show/hide options in the inspector |
 | **Multi action** | Chain any actions with delays |
 
 - **Hold actions**: a quick tap runs the main action, holding (configurable) runs a second one.

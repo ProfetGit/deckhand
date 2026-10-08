@@ -33,78 +33,123 @@ def _load_color(v, default):
     return c if c.isValid() else QColor(default)
 
 
-def _gauge_color(v):
-    if v < 60:
+def _pcolor(params, key, default):
+    """Colour option: '' / missing / invalid means 'auto' and gives the default."""
+    v = params.get(key)
+    c = QColor(v) if isinstance(v, str) and v else QColor()
+    return c if c.isValid() else QColor(default)
+
+
+def _pint(params, key, default, lo, hi):
+    try:
+        v = int(params.get(key, default))
+    except (TypeError, ValueError):
+        v = default
+    return max(lo, min(hi, v))
+
+
+def _pscale(params):
+    return _pint(params, "scale", 100, 50, 140) / 100
+
+
+def _gauge_color(v, params=None):
+    params = params or {}
+    if params.get("color_mode") == "fixed":
+        return _pcolor(params, "bar_color", "#3ddc84")
+    crit = _pint(params, "crit", 85, 1, 100)
+    warn = min(_pint(params, "warn", 60, 1, 99), crit)
+    if v < warn:
         return QColor("#3ddc84")
-    if v < 85:
+    if v < crit:
         return QColor("#ffb020")
     return QColor("#ff5a5f")
+
+
+DATE_FORMATS = actions.DATE_STRFTIME
 
 
 def _draw_clock(p, s, params, color):
     now = time.localtime()
     fmt = params.get("fmt", "24h")
     sec = params.get("seconds")
+    sc = _pscale(params)
+    tcol = _pcolor(params, "color", color)
     if fmt == "12h":
         t = time.strftime("%I:%M" + (":%S" if sec else ""), now).lstrip("0")
-        suffix = time.strftime("%p", now)
+        suffix = ("AM" if now.tm_hour < 12 else "PM") if params.get("ampm", True) else ""
     else:
         t = time.strftime("%H:%M" + (":%S" if sec else ""), now)
         suffix = ""
     date = params.get("date", True)
     size = 72 * s
-    big = (25 if sec else 28) * s if not date else (23 if sec else 26) * s
+    big = ((25 if sec else 28) * s if not date else (23 if sec else 26) * s) * sc
     box = QRectF(0, size * (0.16 if date else 0.28), size, size * 0.42)
-    _text(p, box, t, big, color, True, shadow=False)
+    if not date and not suffix:
+        box = QRectF(0, size * 0.25, size, size * 0.5)
+    _text(p, box, t, big, tcol, True, shadow=False)
     if suffix:
-        _text(p, QRectF(0, box.bottom() - 2 * s, size, 12 * s), suffix, 10 * s, "#9aa0aa", True, shadow=False)
+        _text(p, QRectF(0, (3 if date else box.bottom() / s - 2) * s, size, 12 * s), suffix, 10 * s, _pcolor(params, "date_color", "#9aa0aa"), True, shadow=False)
     if date:
-        _text(p, QRectF(0, size * 0.66, size, size * 0.2), time.strftime("%a %-d %b", now), 11 * s, "#9aa0aa", False, shadow=False)
+        fmt_d = DATE_FORMATS.get(params.get("date_fmt"), DATE_FORMATS["short"])
+        _text(p, QRectF(0, size * 0.66, size, size * 0.2), time.strftime(fmt_d, now), 11 * s, _pcolor(params, "date_color", "#9aa0aa"), False, shadow=False)
 
 
-def _draw_bar(p, r, label, value, s):
+def _draw_bar(p, r, label, value, s, params):
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QColor(255, 255, 255, 28))
     p.drawRoundedRect(r, 3 * s, 3 * s)
-    p.setBrush(_gauge_color(value))
+    p.setBrush(_gauge_color(value, params))
     p.drawRoundedRect(QRectF(r.x(), r.y(), max(r.height(), r.width() * value / 100), r.height()), 3 * s, 3 * s)
     p.setFont(_font(9.5 * s, True))
-    p.setPen(QColor("#e6e8ec"))
-    p.drawText(QRectF(r.x() + 4 * s, r.y(), r.width() - 8 * s, r.height()), int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), label)
-    p.drawText(QRectF(r.x() + 4 * s, r.y(), r.width() - 8 * s, r.height()), int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight), f"{value:.0f}%")
+    inner = QRectF(r.x() + 4 * s, r.y(), r.width() - 8 * s, r.height())
+    if params.get("show_label", True):
+        p.setPen(_pcolor(params, "label_color", "#e6e8ec"))
+        p.drawText(inner, int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), label)
+    if params.get("show_value", True):
+        p.setPen(_pcolor(params, "value_color", "#e6e8ec"))
+        p.drawText(inner, int(Qt.AlignmentFlag.AlignVCenter | (Qt.AlignmentFlag.AlignRight if params.get("show_label", True) else Qt.AlignmentFlag.AlignHCenter)), f"{value:.0f}%")
 
 
-def _draw_gauge(p, size, value, label, sub, s):
+def _draw_gauge(p, size, value, label, sub, s, params):
+    show_label, show_value = params.get("show_label", True), params.get("show_value", True)
     r = QRectF(size * 0.15, size * 0.1, size * 0.7, size * 0.7)
+    if not show_label:
+        r = QRectF(size * 0.13, size * 0.13, size * 0.74, size * 0.74)
     pen = QPen(QColor(255, 255, 255, 30), 5.5 * s)
     pen.setCapStyle(Qt.PenCapStyle.RoundCap)
     p.setPen(pen)
     p.setBrush(Qt.BrushStyle.NoBrush)
     p.drawArc(r, 225 * 16, -270 * 16)
-    pen.setColor(_gauge_color(value))
+    pen.setColor(_gauge_color(value, params))
     p.setPen(pen)
     p.drawArc(r, 225 * 16, int(-270 * 16 * max(0.02, value / 100)))
-    _text(p, r, f"{value:.0f}", 19 * s, "#ffffff", True, shadow=False)
-    _text(p, QRectF(0, size * 0.77, size, size * 0.2), label + (f" {sub}" if sub else ""), 10 * s, "#9aa0aa", True, shadow=False)
+    if show_value:
+        _text(p, r, f"{value:.0f}", 19 * s, _pcolor(params, "value_color", "#ffffff"), True, shadow=False)
+    if show_label and (label or sub):
+        _text(p, QRectF(0, size * 0.77, size, size * 0.2), label + (f" {sub}" if sub else ""), 10 * s,
+              _pcolor(params, "label_color", "#9aa0aa"), True, shadow=False)
+    elif sub:
+        _text(p, QRectF(0, size * 0.77, size, size * 0.2), sub, 10 * s, _pcolor(params, "label_color", "#9aa0aa"), True, shadow=False)
 
 
 def _draw_sysmon(p, s, params):
     size = 72 * s
     metric = params.get("metric", "both")
     if metric == "both":
-        _draw_bar(p, QRectF(6 * s, 12 * s, size - 12 * s, 21 * s), "CPU", sysinfo.cpu_percent(), s)
-        _draw_bar(p, QRectF(6 * s, 40 * s, size - 12 * s, 21 * s), "RAM", sysinfo.ram_percent(), s)
+        _draw_bar(p, QRectF(6 * s, 12 * s, size - 12 * s, 21 * s), "CPU", sysinfo.cpu_percent(), s, params)
+        _draw_bar(p, QRectF(6 * s, 40 * s, size - 12 * s, 21 * s), "RAM", sysinfo.ram_percent(), s, params)
     elif metric == "cpu":
-        _draw_gauge(p, size, sysinfo.cpu_percent(), "CPU", "", s)
+        _draw_gauge(p, size, sysinfo.cpu_percent(), "CPU", "", s, params)
     elif metric == "ram":
-        _draw_gauge(p, size, sysinfo.ram_percent(), "RAM", "", s)
+        _draw_gauge(p, size, sysinfo.ram_percent(), "RAM", "", s, params)
     else:
         u, _m, t = sysinfo.gpu_percent()
         if u is None:
             _text(p, QRectF(0, size * 0.28, size, size * 0.3), "N/A", 20 * s, "#9aa0aa", True, shadow=False)
             _text(p, QRectF(0, size * 0.62, size, size * 0.2), "GPU not found", 9.5 * s, "#6c717c", False, shadow=False)
         else:
-            _draw_gauge(p, size, u, "GPU", f"{t:.0f}°" if t is not None else "", s)
+            sub = f"{t:.0f}°" if t is not None and params.get("show_temp", True) else ""
+            _draw_gauge(p, size, u, "GPU", sub, s, params)
 
 
 def _cover(p, img, size):
@@ -137,7 +182,8 @@ def _draw_nowplaying(p, s, params):
         p.fillRect(QRectF(0, 0, size, size), g)
         icons.paint_glyph(p, "music", QRectF(size * 0.25, size * 0.12, size * 0.5, size * 0.5), "#8fa3d6", 1.8)
     if status != "Playing":
-        p.fillRect(QRectF(0, 0, size, size), QColor(0, 0, 0, 120))
+        if params.get("dim_paused", True):
+            p.fillRect(QRectF(0, 0, size, size), QColor(0, 0, 0, 120))
         icons.paint_glyph(p, "pause", QRectF(size * 0.74, size * 0.06, size * 0.2, size * 0.2), "#ffffff", 2.4)
     if params.get("show_text", True) and (title or artist):
         g = QLinearGradient(0, size * 0.38, 0, size)
@@ -158,13 +204,13 @@ def _draw_nowplaying(p, s, params):
         tpx, ttxt = fit(title or artist, (11, 10, 9, 8.5), True)
         fm_t = QFontMetricsF(_font(tpx * s, True))
         p.setFont(_font(tpx * s, True))
-        p.setPen(QColor("white"))
+        p.setPen(_pcolor(params, "text_color", "#ffffff"))
         p.drawText(QRectF(m, size * 0.57, avail, fm_t.height()), int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), ttxt)
-        if artist and title:
+        if artist and title and params.get("show_artist", True):
             apx, atxt = fit(artist, (9, 8.5, 7.5), False)
             fm_a = QFontMetricsF(_font(apx * s, False))
             p.setFont(_font(apx * s, False))
-            p.setPen(QColor("#c4c9d4"))
+            p.setPen(_pcolor(params, "artist_color", "#c4c9d4"))
             p.drawText(QRectF(m, size * 0.57 + fm_t.height() + 1 * s, avail, fm_a.height()), int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), atxt)
 
 
@@ -177,12 +223,17 @@ def _clock_text(secs):
 
 def _draw_counter(p, s, params, color):
     size = 72 * s
-    txt = str(params.get("value", 0))
-    px = (30 if len(txt) <= 3 else 23 if len(txt) <= 5 else 16) * s
-    has_label = bool(params.get("label"))
-    _text(p, QRectF(0, size * (0.12 if has_label else 0.2), size, size * 0.5), txt, px, color, True, shadow=False)
-    if has_label:
-        _text(p, QRectF(4 * s, size * 0.66, size - 8 * s, size * 0.22), params["label"][:14], 10.5 * s, "#9aa0aa", False, shadow=False)
+    try:
+        value = int(params.get("value", 0))
+    except (TypeError, ValueError):
+        value = 0
+    txt = str(value)
+    px = (30 if len(txt) <= 3 else 23 if len(txt) <= 5 else 16) * s * _pscale(params)
+    label = str(params.get("label") or "")
+    col = _pcolor(params, "negative_color", color) if value < 0 and params.get("negative_color") else _pcolor(params, "color", color)
+    _text(p, QRectF(0, size * (0.12 if label else 0.2), size, size * 0.5), txt, px, col, True, shadow=False)
+    if label:
+        _text(p, QRectF(4 * s, size * 0.66, size - 8 * s, size * 0.22), label[:14], 10.5 * s, _pcolor(params, "label_color", "#9aa0aa"), False, shadow=False)
 
 
 def _draw_timer(p, s, params, color):
@@ -190,18 +241,21 @@ def _draw_timer(p, s, params, color):
     run = params.get("_run") or {}
     secs = run.get("seconds", 0)
     txt = _clock_text(secs)
-    col = "#ff6b6b" if run.get("done") else "#3ddc84" if run.get("running") else color
-    px = (24 if len(txt) <= 5 else 17) * s
-    _text(p, QRectF(0, size * 0.16, size, size * 0.42), txt, px, col, True, shadow=False)
+    idle = run.get("idle", not secs)
     if run.get("done"):
-        label = "Done!"
+        col, label = _pcolor(params, "done_color", "#ff6b6b"), "Done!"
     elif run.get("running"):
-        label = "Running"
-    elif run.get("idle", not secs):
-        label = "Countdown" if params.get("mode") == "countdown" else "Stopwatch"
+        col, label = _pcolor(params, "run_color", "#3ddc84"), "Running"
+    elif idle:
+        col, label = _pcolor(params, "color", color), "Countdown" if params.get("mode") == "countdown" else "Stopwatch"
     else:
-        label = "Paused"
-    _text(p, QRectF(0, size * 0.64, size, size * 0.22), label, 10.5 * s, "#ff9a9a" if run.get("done") else "#9aa0aa", bool(run.get("done")), shadow=False)
+        col, label = _pcolor(params, "paused_color", _pcolor(params, "color", color).name()), "Paused"
+    px = (24 if len(txt) <= 5 else 17) * s * _pscale(params)
+    caption = params.get("show_caption", True)
+    _text(p, QRectF(0, size * (0.16 if caption else 0.25), size, size * (0.42 if caption else 0.5)), txt, px, col, True, shadow=False)
+    if caption:
+        ccol = _pcolor(params, "caption_color", "#ff9a9a" if run.get("done") else "#9aa0aa")
+        _text(p, QRectF(0, size * 0.64, size, size * 0.22), label, 10.5 * s, ccol, bool(run.get("done")), shadow=False)
 
 
 def _icon_spec(key):
