@@ -114,4 +114,13 @@ def install(app):
     if _fx is None:
         _fx = ButtonFx(app)
         app.installEventFilter(_fx)
+        app.aboutToQuit.connect(uninstall)      # never let the filter outlive the widgets it watches
     return _fx
+
+
+def uninstall():
+    global _fx
+    if _fx is not None:
+        from PyQt6.QtWidgets import QApplication
+        QApplication.instance().removeEventFilter(_fx)
+        _fx = None

@@ -80,10 +80,15 @@ check("round page tabs get a matching round glow", pages and glow(pages[0]).radi
 from deckhand.prefs import PrefsDialog
 from deckhand.agents_dialog import AgentsDialog
 from deckhand.mcp_server import McpServer
-for d in (PrefsDialog(e, mw), AgentsDialog(e, McpServer(e), mw)):
+srv = McpServer(e)
+for d in (PrefsDialog(e, mw), AgentsDialog(e, srv, mw)):
     d.show(); spin(0.2)
     db = [x for x in d.findChildren(QPushButton) if x.objectName() != "hoverGlow"]
     check(f"{type(d).__name__}: buttons have pointer + glow", db and all(glow(x) is not None and x.cursor().shape() == Qt.CursorShape.PointingHandCursor for x in db if x.isEnabled()))
     d.close()
-e.shutdown()
+# deterministic teardown (a crash on interpreter exit once failed CI after every check had passed)
+srv.stop(); mw.close(); w.close(); e.shutdown(); buttonfx.uninstall()
+for x in (mw, w): x.deleteLater()
+app.processEvents(); app.sendPostedEvents(None, QEvent.Type.DeferredDelete.value) if False else None
+spin(0.1)
 print("FAILED:", fails if fails else "none"); sys.exit(1 if fails else 0)
