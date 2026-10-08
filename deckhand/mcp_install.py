@@ -15,19 +15,27 @@ def home(*parts):
     return os.path.join(os.path.expanduser("~"), *parts)
 
 
-def ensure_launcher():
+def launcher_path():
+    """The command that starts Deckhand: the per-user launcher, else a system-installed one, else a new per-user launcher."""
     if os.path.isfile(LAUNCHER) and os.access(LAUNCHER, os.X_OK):
-        return
+        return LAUNCHER
+    system = shutil.which("deckhand")
+    if system and system.startswith(("/usr/", "/opt/", "/app/")):
+        return system
     os.makedirs(os.path.dirname(LAUNCHER), exist_ok=True)
     with open(LAUNCHER, "w") as f:
         f.write(f'#!/bin/sh\ncd "{PKG_ROOT}" && exec python3 -m deckhand "$@"\n')
     os.chmod(LAUNCHER, 0o755)
+    return LAUNCHER
+
+
+def ensure_launcher():
+    launcher_path()
 
 
 def server_command():
     """(command, args, env) that starts the stdio MCP server."""
-    ensure_launcher()
-    return LAUNCHER, ["mcp"], {}
+    return launcher_path(), ["mcp"], {}
 
 
 def config_snippet():

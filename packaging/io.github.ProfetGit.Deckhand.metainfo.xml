@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.ProfetGit.Deckhand</id>
+  <name>Deckhand</name>
+  <summary>A modern Stream Deck studio for Linux</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://github.com/ProfetGit/deckhand</url>
+  <url type="bugtracker">https://github.com/ProfetGit/deckhand/issues</url>
+  <description>
+    <p>Design your Stream Deck keys by drag and drop: hotkeys, text, apps, websites, live widgets (clock, system monitor, now playing, timer, counter), multi actions, pages, folders and profiles. Animated wallpapers, per-app profile switching and AI agent control are built in.</p>
+  </description>
+  <launchable type="desktop-id">deckhand.desktop</launchable>
+  <provides><binary>deckhand</binary></provides>
+  <releases><release version="1.0.0" date="2026-10-07"/></releases>
+  <content_rating type="oars-1.1"/>
+</component>
