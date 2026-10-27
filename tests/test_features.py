@@ -271,5 +271,41 @@ except agentapi.ToolError: check("hold folder rejected", True)
 check("agent http action validated", t.call("set_key", {"index": 14, "action": {"type": "http", "params": {"url": "https://example.com", "method": "post", "body": "{}"}}})["updated"] == [14] or True)
 try: t.call("add_template_page", {"template": "x"}); check("agent unknown template rejected", False)
 except agentapi.ToolError: check("agent unknown template rejected", True)
+# ---- start in the tray
+from PyQt6.QtWidgets import QSystemTrayIcon
+from deckhand import model as _m
+check("start_in_tray setting: default off, kept when valid, cleaned when junk", _m.clean_settings({})["start_minimized"] is False
+      and _m.clean_settings({"start_minimized": True})["start_minimized"] is True and _m.clean_settings({"start_minimized": "x"})["start_minimized"] is True)
+e.set_setting("start_minimized", True); check("setting persists through the engine", _m.Settings()["start_minimized"] is True)
+orig_avail = QSystemTrayIcon.isSystemTrayAvailable
+def fresh(): ww = MainWindow(e); ww.hide(); return ww
+QSystemTrayIcon.isSystemTrayAvailable = staticmethod(lambda: True)
+w5 = fresh(); w5.start_window(True); app.processEvents(); check("hidden start with a tray keeps the window hidden", not w5.isVisible() and w5.tray is not None)
+w6 = fresh(); w6.start_window(False); app.processEvents(); check("normal start shows the window", w6.isVisible())
+QSystemTrayIcon.isSystemTrayAvailable = staticmethod(lambda: False)
+w7 = fresh(); w7.start_window(True); app.processEvents(); check("no tray yet: stays hidden while waiting", not w7.isVisible() and w7.tray is None and w7._tray_wait.isActive())
+QSystemTrayIcon.isSystemTrayAvailable = staticmethod(lambda: True)
+w7._tray_wait.timeout.emit(); app.processEvents(); check("tray appears later: gets it, stays hidden, stops waiting", w7.tray is not None and not w7.isVisible() and not w7._tray_wait.isActive())
+QSystemTrayIcon.isSystemTrayAvailable = staticmethod(lambda: False)
+w8 = fresh(); w8.start_window(True); w8._tray_left = 1; w8._tray_wait.timeout.emit(); app.processEvents()
+check("tray never appears: the window opens so Deckhand stays reachable", w8.isVisible() and not w8._tray_wait.isActive())
+QSystemTrayIcon.isSystemTrayAvailable = orig_avail
+e.set_setting("start_minimized", False)
+
+# ---- a second --minimized launch (autostart race, an agent's bridge) must not pop the window up
+from PyQt6.QtNetwork import QLocalServer
+from deckhand import app as app_mod
+app_mod.SOCKET = "deckhand-ipc-test-" + str(os.getpid())
+QLocalServer.removeServer(app_mod.SOCKET); srv = QLocalServer(); srv.listen(app_mod.SOCKET)
+w9 = fresh(); srv.newConnection.connect(lambda: app_mod.handle_ipc(srv, w9))
+def second(show):
+    import threading
+    r = []; t = threading.Thread(target=lambda: r.append(app_mod._already_running(show=show))); t.start()
+    end = time.monotonic() + 3
+    while t.is_alive() and time.monotonic() < end: app.processEvents(); time.sleep(0.01)
+    app.processEvents(); return r and r[0]
+check("--minimized second launch reaches the running app without showing it", second(False) is True and not w9.isVisible())
+check("a normal second launch brings the window up", second(True) is True and w9.isVisible())
+srv.close()
 e.shutdown()
 print("FAILED:", fails if fails else "none"); sys.exit(1 if fails else 0)

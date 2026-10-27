@@ -13,16 +13,25 @@ from . import style
 SOCKET = "deckhand-ipc"
 
 
-def _already_running():
+def _already_running(show=True):
     s = QLocalSocket()
     s.connectToServer(SOCKET)
     if s.waitForConnected(300):
-        s.write(b"show")
+        s.write(b"show" if show else b"ping")
         s.flush()
         s.waitForBytesWritten(300)
         s.disconnectFromServer()
         return True
     return False
+
+
+def handle_ipc(server, win):
+    """A second launch talks to the running one: "show" raises the window, anything else (e.g. "ping") does not."""
+    sock = server.nextPendingConnection()
+    if sock is not None:
+        sock.waitForReadyRead(300)
+        if bytes(sock.readAll()).startswith(b"show"):
+            win.show_front()
 
 
 def _install_crash_guard():
@@ -58,8 +67,9 @@ def main():
     lock.setStaleLockTime(0)
     if not lock.tryLock(0):
         # Another instance owns the app (maybe still starting up): ask it to show its window, then leave.
+        # A --minimized launch (autostart, an agent's bridge) must never bring the window up.
         for _ in range(20):
-            if _already_running():
+            if _already_running(show=not minimized):
                 break
             time.sleep(0.15)
         return 0
@@ -86,7 +96,7 @@ def main():
     backup.auto_backup()
     engine = Engine()
     win = MainWindow(engine)
-    server.newConnection.connect(lambda: (server.nextPendingConnection(), win.show_front()))
+    server.newConnection.connect(lambda: handle_ipc(server, win))
     from .mcp_server import McpServer
     mcp = McpServer(engine)
     mcp.start()
@@ -94,6 +104,5 @@ def main():
     app.aboutToQuit.connect(mcp.stop)
     app.aboutToQuit.connect(engine.shutdown)
     engine.start()
-    if not (minimized and win.tray):
-        win.show()
+    win.start_window(minimized or engine.settings["start_minimized"])
     return app.exec()

@@ -131,6 +131,10 @@ class PrefsDialog(QDialog):
         au.toggled.connect(set_autostart)
         row("Start with the desktop", au, "Launches minimized to the tray at login.")
 
+        sm = Switch(s["start_minimized"])
+        sm.toggled.connect(lambda v: engine.set_setting("start_minimized", v))
+        row("Start in the tray", sm, "Don't open the window when Deckhand starts, however it is launched. Your keys work right away.")
+
         ct = Switch(s["close_to_tray"])
         ct.toggled.connect(lambda v: engine.set_setting("close_to_tray", v))
         row("Keep running in the tray", ct, "Closing the window keeps your keys working.")

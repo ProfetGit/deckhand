@@ -278,6 +278,28 @@ class MainWindow(QMainWindow):
         self.tray.activated.connect(lambda r: self.toggle_visible() if r == QSystemTrayIcon.ActivationReason.Trigger else None)
         self.tray.show()
 
+    TRAY_WAIT_S = 90
+
+    def start_window(self, hidden):
+        """Show the window, or stay in the tray. At login the tray may not exist yet, so a hidden start waits for it
+        and only opens the window if it never appears (otherwise Deckhand would be running with no way to reach it)."""
+        if not hidden:
+            self.show()
+        elif not self.tray:
+            self._tray_wait = QTimer(self)
+            self._tray_wait.setInterval(2000)
+            self._tray_left = self.TRAY_WAIT_S * 1000 // 2000
+            self._tray_wait.timeout.connect(self._tray_retry)
+            self._tray_wait.start()
+
+    def _tray_retry(self):
+        self._tray()
+        self._tray_left -= 1
+        if self.tray or self._tray_left <= 0:
+            self._tray_wait.stop()
+            if not self.tray and not self.isVisible():
+                self.show_front()
+
     def _tray_menu_fill(self):
         m = self.tray_menu
         m.clear()
